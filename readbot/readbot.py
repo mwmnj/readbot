@@ -3,17 +3,20 @@ import urllib2
 import subprocess
 import tempfile
 import os
-
+import atexit
+import shutil
 
 class ReadBot(object):
 
     def __init__(self, ocr_engine='tesseract', pdf_converter='ghostscript'):
         self.ocr_engine = ocr_engine
         self.pdf_converter = pdf_converter
+        self.temp = tempfile.mkdtemp()
+        atexit.register(shutil.rmtree,self.temp)
+
 
     def interpret(self, input_file):
         '''valid input is a file like object or string (url or path) to an image or pdf file'''
-
         if type(input_file) is str:
             input_file = self.open_url_or_file(input_file)
 
@@ -56,14 +59,16 @@ class ReadBot(object):
 
     def pdf_to_img(self, pdf):
 
-        pdf_conversion = tempfile.NamedTemporaryFile(suffix='.png')
+        pdf_conversion  = tempfile.NamedTemporaryFile(suffix='.png')
 
         if self.pdf_converter == 'ghostscript':
             try:
-                subprocess.call(['gs', '-sDEVICE=pngalpha', '-sOutputFile=' +
-                                pdf_conversion.name, '-r144', pdf])
+                subprocess.call(['gs', '-sDEVICE=pngalpha', '-dNOPAUSE', '-dBATCH', '-sOutputFile=' +
+                                self.temp + '/%d.png', '-r300', pdf])
+                subprocess.call(['convert', self.temp + '/[0-9].png' , '-append', pdf_conversion.name])
+
             except OSError:
-                raise RuntimeError("Failed to run ghostscript command for pdf conversion. Is it installed? http://www.ghostscript.com/")
+                raise RuntimeError("Failed to convert pdf. Are Ghostscript (http://www.ghostscript.com/) and ImageMagick (http://www.imagemagick.org/) installed?")
 
         return pdf_conversion
 
@@ -72,25 +77,24 @@ class ReadBot(object):
         engine = OcrEngine()
 
         if self.ocr_engine == 'tesseract':
-            ocr_result = engine.tesseract(input_file)
+            ocr_result = engine.tesseract(input_file,self.temp)
 
         return ocr_result
 
 
 class OcrEngine(object):
 
-    def tesseract(self, input_file):
+    def tesseract(self, input_file, temp):
 
         try:
             subprocess.call(['tesseract', input_file.name,
-                            tempfile.gettempdir() + '/ocr_result'])
+                            temp + '/ocr_result'])
         except OSError:
             raise RuntimeError("Failed to run tesseract command. Is it installed? http://code.google.com/p/tesseract-ocr/")
 
         ocr_result = open(
-            tempfile.gettempdir() + '/ocr_result' + '.txt', 'rb+').read().strip()
+            temp + '/ocr_result' + '.txt', 'rb+').read().strip()
 
-        os.remove(tempfile.gettempdir() + '/ocr_result' + '.txt')
+        os.remove(temp + '/ocr_result' + '.txt')
 
         return ocr_result
-
