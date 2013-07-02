@@ -65,7 +65,7 @@ class ReadBot(object):
             try:
                 subprocess.call(['gs', '-sDEVICE=pngalpha', '-dNOPAUSE', '-dBATCH', '-sOutputFile=' +
                                 self.temp + '/%d.png', '-r300', pdf])
-                subprocess.call(['convert', self.temp + '/[0-9].png' , '-append', pdf_conversion.name])
+                subprocess.call(['convert', self.temp + '/*.png' , '-append', pdf_conversion.name])
 
             except OSError:
                 raise RuntimeError("Failed to convert pdf. Are Ghostscript (http://www.ghostscript.com/) and ImageMagick (http://www.imagemagick.org/) installed?")
